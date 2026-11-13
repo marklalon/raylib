@@ -4102,10 +4102,10 @@ void rlDrawVertexArray(int offset, int count)
 void rlDrawVertexArrayElements(int offset, int count, const void *buffer)
 {
     // NOTE: Added pointer math separately from function to avoid UBSAN complaining
-    unsigned short *bufferPtr = (unsigned short *)buffer;
+    unsigned int *bufferPtr = (unsigned int *)buffer;
     if (offset > 0) bufferPtr += offset;
 
-    glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, (const unsigned short *)bufferPtr);
+    glDrawElements(GL_TRIANGLES, count, GL_UNSIGNED_INT, (const unsigned int *)bufferPtr);
 }
 
 // Draw vertex array instanced
@@ -4121,10 +4121,10 @@ void rlDrawVertexArrayElementsInstanced(int offset, int count, const void *buffe
 {
 #if defined(GRAPHICS_API_OPENGL_33) || defined(GRAPHICS_API_OPENGL_ES2)
     // NOTE: Added pointer math separately from function to avoid UBSAN complaining
-    unsigned short *bufferPtr = (unsigned short *)buffer;
+    unsigned int *bufferPtr = (unsigned int *)buffer;
     if (offset > 0) bufferPtr += offset;
 
-    glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_SHORT, (const unsigned short *)bufferPtr, instances);
+    glDrawElementsInstanced(GL_TRIANGLES, count, GL_UNSIGNED_INT, (const unsigned int *)bufferPtr, instances);
 #endif
 }
 

@@ -1419,7 +1419,7 @@ void UploadMesh(Mesh *mesh, bool dynamic)
 
     if (mesh->indices != NULL)
     {
-        mesh->vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES] = rlLoadVertexBufferElement(mesh->indices, mesh->triangleCount*3*sizeof(unsigned short), dynamic);
+        mesh->vboId[RL_DEFAULT_SHADER_ATTRIB_LOCATION_INDICES] = rlLoadVertexBufferElement(mesh->indices, mesh->triangleCount*3*sizeof(unsigned int), dynamic);
     }
 
     if (mesh->vaoId > 0) TRACELOG(LOG_INFO, "VAO: [ID %i] Mesh uploaded successfully to VRAM (GPU)", mesh->vaoId);
@@ -2127,7 +2127,7 @@ bool ExportMeshAsCode(Mesh mesh, const char *fileName)
 
     if (mesh.indices != NULL)       // Vertex indices (3 index per triangle - unsigned short)
     {
-        byteCount += sprintf(txtData + byteCount, "static unsigned short %s_INDEX_DATA[%i] = { ", varFileName, mesh.triangleCount*3);
+        byteCount += sprintf(txtData + byteCount, "static unsigned int %s_INDEX_DATA[%i] = { ", varFileName, mesh.triangleCount*3);
         for (int i = 0; i < mesh.triangleCount*3 - 1; i++) byteCount += sprintf(txtData + byteCount, ((i%TEXT_BYTES_PER_LINE == 0)? "%i,\n" : "%i, "), mesh.indices[i]);
         byteCount += sprintf(txtData + byteCount, "%i };\n", mesh.indices[mesh.triangleCount*3 - 1]);
     }
@@ -2700,7 +2700,7 @@ Mesh GenMeshPlane(float width, float length, int resX, int resZ)
     mesh.vertices = (float *)RL_MALLOC(mesh.vertexCount*3*sizeof(float));
     mesh.texcoords = (float *)RL_MALLOC(mesh.vertexCount*2*sizeof(float));
     mesh.normals = (float *)RL_MALLOC(mesh.vertexCount*3*sizeof(float));
-    mesh.indices = (unsigned short *)RL_MALLOC(mesh.triangleCount*3*sizeof(unsigned short));
+    mesh.indices = (unsigned int *)RL_MALLOC(mesh.triangleCount*3*sizeof(unsigned int));
 
     // Mesh vertices position array
     for (int i = 0; i < mesh.vertexCount; i++)
@@ -2867,7 +2867,7 @@ Mesh GenMeshCube(float width, float height, float length)
     mesh.normals = (float *)RL_MALLOC(24*3*sizeof(float));
     memcpy(mesh.normals, normals, 24*3*sizeof(float));
 
-    mesh.indices = (unsigned short *)RL_MALLOC(36*sizeof(unsigned short));
+    mesh.indices = (unsigned int *)RL_MALLOC(36*sizeof(unsigned int));
 
     int k = 0;
 
@@ -4822,7 +4822,7 @@ static Model LoadIQM(const char *fileName)
         model.meshes[i].boneWeights = (float *)RL_CALLOC(model.meshes[i].vertexCount*4, sizeof(float));      // Up-to 4 bones supported!
 
         model.meshes[i].triangleCount = imesh[i].num_triangles;
-        model.meshes[i].indices = (unsigned short *)RL_CALLOC(model.meshes[i].triangleCount*3, sizeof(unsigned short));
+        model.meshes[i].indices = (unsigned int *)RL_CALLOC(model.meshes[i].triangleCount*3, sizeof(unsigned int));
 
 #if !SUPPORT_GPU_SKINNING
         // Animated vertex data, processed for rendering
@@ -6082,25 +6082,23 @@ static Model LoadGLTF(const char *fileName)
                         if (attribute->component_type == cgltf_component_type_r_16u)
                         {
                             // Init raylib mesh indices to copy glTF attribute data
-                            model.meshes[meshIndex].indices = (unsigned short *)RL_MALLOC(attribute->count*sizeof(unsigned short));
+                            model.meshes[meshIndex].indices = (unsigned int *)RL_MALLOC(attribute->count*sizeof(unsigned int));
 
-                            // Load unsigned short data type into mesh.indices
-                            LOAD_ATTRIBUTE(attribute, 1, unsigned short, model.meshes[meshIndex].indices)
+                            // Load unsigned short data type into mesh.indices (widened to 32-bit)
+                            LOAD_ATTRIBUTE_CAST(attribute, 1, unsigned short, model.meshes[meshIndex].indices, unsigned int)
                         }
                         else if (attribute->component_type == cgltf_component_type_r_8u)
                         {
                             // Init raylib mesh indices to copy glTF attribute data
-                            model.meshes[meshIndex].indices = (unsigned short *)RL_MALLOC(attribute->count*sizeof(unsigned short));
-                            LOAD_ATTRIBUTE_CAST(attribute, 1, unsigned char, model.meshes[meshIndex].indices, unsigned short)
+                            model.meshes[meshIndex].indices = (unsigned int *)RL_MALLOC(attribute->count*sizeof(unsigned int));
+                            LOAD_ATTRIBUTE_CAST(attribute, 1, unsigned char, model.meshes[meshIndex].indices, unsigned int)
 
                         }
                         else if (attribute->component_type == cgltf_component_type_r_32u)
                         {
-                            // Init raylib mesh indices to copy glTF attribute data
-                            model.meshes[meshIndex].indices = (unsigned short *)RL_MALLOC(attribute->count*sizeof(unsigned short));
-                            LOAD_ATTRIBUTE_CAST(attribute, 1, unsigned int, model.meshes[meshIndex].indices, unsigned short);
-
-                            TRACELOG(LOG_WARNING, "MODEL: [%s] Indices data converted from u32 to u16, possible loss of data", fileName);
+                            // Init raylib mesh indices to copy glTF attribute data (32-bit, no truncation)
+                            model.meshes[meshIndex].indices = (unsigned int *)RL_MALLOC(attribute->count*sizeof(unsigned int));
+                            LOAD_ATTRIBUTE(attribute, 1, unsigned int, model.meshes[meshIndex].indices);
                         }
                         else TRACELOG(LOG_WARNING, "MODEL: [%s] Indices data format not supported, use u16", fileName);
                     }
@@ -6818,10 +6816,9 @@ static Model LoadVOX(const char *fileName)
         pmesh->normals = (float *)RL_MALLOC(size);
         memcpy(pmesh->normals, pnormals, size);
 
-        // Copy indices
-        size = voxarray.indices.used*sizeof(unsigned short);
-        pmesh->indices = (unsigned short *)RL_MALLOC(size);
-        memcpy(pmesh->indices, pindices, size);
+        // Copy indices (widened from 16-bit VOX data to 32-bit Mesh.indices)
+        pmesh->indices = (unsigned int *)RL_MALLOC(voxarray.indices.used*sizeof(unsigned int));
+        for (int idx = 0; idx < voxarray.indices.used; idx++) pmesh->indices[idx] = pindices[idx];
 
         pmesh->triangleCount = (pmesh->vertexCount/4)*2;
 
